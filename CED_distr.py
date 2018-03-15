@@ -20,8 +20,8 @@ el_price = pd.read_csv(filename0,index_col=[0])['Market price ($/MWh)']
 
 filename1=data_path+r'\info.csv'
 info = pd.read_csv(filename1,index_col=[0])
-info.at[info.index[-1],'Pmin'] = -np.inf
-info.at[info.index[-1],'Pmax'] = np.inf
+info.at[info.index[-1],'Pmin'] = 0 #-np.inf
+info.at[info.index[-1],'Pmax'] = 0 #np.inf
 
 filename2=data_path+r'\load_min.csv'
 load_min = pd.read_csv(filename2,index_col=[0], skiprows = [1])
@@ -37,21 +37,12 @@ network = pd.read_csv(filename5,index_col=[0])
 
 time = el_price.index
 #%%
-num_agents = info.shape[0]
-num_prod = sum(info['Type']=='Producer')
-num_cons = sum(info['Type']=='Consumer')
 TMST = load_max.shape[0]
 
 cons = info[info['Type']=='Consumer'].index
 prod = info[info['Type']=='Producer'].index
 prod_ren = info[(info['Type']=='Producer') & ((info['Energy']=='Wind') | (info['Energy']=='Solar'))].index
 prod_conv = info[(info['Type']=='Producer') & ~((info['Energy']=='Wind') | (info['Energy']=='Solar'))].index
-g = len(prod_conv)
-n = num_agents
-h = 48
-
-el_price_e = el_price
-tau = 10
 
 a = info['a']
 b = info['b']
@@ -75,7 +66,9 @@ for i in p2p:
     p2p_ag += [info[info['p2p']==i].index.unique()]
     n += len(info[info['p2p']==i].index.unique())
 
-n += 1 # +1 is for accounting grid
+grid = True
+if grid:
+    n += 1 # +1 is for accounting grid
     
 ID_CM = []
 ID_comm = []
@@ -107,18 +100,20 @@ for idx in ID_CM:
     inc[idx,ID_p2p[-1],idx_mrk-1] = 1
     inc[ID_p2p[-1],idx,idx_mrk-1] = 1
 
-#Assigning grid to last p2p market
-ID_grid = n-1
-grid_ag = info.index[-1]
-for idx in ID_CM:
-    inc[-1,idx,idx_mrk-1] = 10
-    inc[idx,-1,idx_mrk-1] = 10
-inc[-1,ID_p2p[-1],idx_mrk-1] = 10
-inc[ID_p2p[-1],-1,idx_mrk-1] = 10
+if grid:
+    #Assigning grid to last p2p market
+    ID_grid = n-1
+    grid_ag = info.index[-1]
+    for idx in ID_CM:
+        inc[-1,idx,idx_mrk-1] = 100
+        inc[idx,-1,idx_mrk-1] = 100
+    inc[-1,ID_p2p[-1],idx_mrk-1] = 100
+    inc[ID_p2p[-1],-1,idx_mrk-1] = 100
 
 
 #%%
-rho = 10
+rho = 100 
+
 #Init Prosumer classes 
 pros = {}
 # Community
@@ -134,8 +129,10 @@ for c in range(n_p2p):
     for i in ID_p2p[c]:
         pros[i] = Prosumer(inc[i,:,:], data = info[info.index==p2p_ag[c][j]], rho = rho)
         j += 1
-# Grid
-pros[ID_grid] = Prosumer(inc[ID_grid,:,:], data = info[info.index==grid_ag], rho = rho)
+
+if grid:
+    # Grid
+    pros[ID_grid] = Prosumer(inc[ID_grid,:,:], data = info[info.index==grid_ag], rho = rho)
 
 display = True
 T = np.zeros([n,n,len(comm_ag)+len(p2p_ag)])
@@ -155,12 +152,12 @@ while abs(T_sum).max() > 1e-3:
 
     
 if display:
-    lim = 100
+    lim = abs(T).max()
     plt.figure()
     ax = plt.axes(projection='3d')
     trades = inc.nonzero()
-    points = ax.scatter3D(trades[0], trades[2], trades[1], c=T[trades], edgecolors = None, cmap='seismic', vmin=-lim, vmax=lim)
-
+    points = ax.scatter3D(trades[0], trades[2], trades[1], c=T[trades], edgecolors = None, cmap='rainbow', vmin=-lim, vmax=lim)
+    plt.colorbar(points)
 
 
 SW = 0

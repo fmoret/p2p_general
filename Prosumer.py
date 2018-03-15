@@ -27,8 +27,8 @@ class Prosumer:
         except TypeError:
             self.data.a = 0
             self.data.b = 0
-            self.data.Pmin = -np.inf
-            self.data.Pmax = np.inf
+            self.data.Pmin = 0
+            self.data.Pmax = 0
             self.data.num_assets = 0
         self.data.partners = inc.nonzero()
         self.data.pref = inc[inc.nonzero()]
@@ -78,7 +78,7 @@ class Prosumer:
     #   Model Updating
     ###    
     def _update_objective(self):
-        augm_lag = (sum(self.y*( self.variables.t - self.t_average ) ) + 
+        augm_lag = (-sum(self.y*( self.variables.t - self.t_average ) ) + 
                     self.data.rho/2*sum( ( self.variables.t - self.t_average )
                                         *( self.variables.t - self.t_average ) )
                    )
@@ -90,6 +90,6 @@ class Prosumer:
     ###    
     def _iter_update(self, trade):
         self.t_average = (self.t_old - trade[self.data.partners])/2
-        self.y += self.data.rho*(self.t_old - self.t_average)
+        self.y -= self.data.rho*(self.t_old - self.t_average)
 #        for i in range(self.data.num_partners):
 #            self.y[i] +=  self.rho*(self.t_old[i] + self.t_others[i])/2
