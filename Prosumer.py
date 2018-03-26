@@ -63,13 +63,17 @@ class Prosumer:
     def _build_variables(self):
         m = self.model
         self.variables.p = np.array([m.addVar(lb = self.data.Pmin[i], ub = self.data.Pmax[i], name = 'p') for i in range(self.data.num_assets)])
-        self.variables.t = np.array([m.addVar(lb = -gb.GRB.INFINITY, obj=self.data.pref[i], name = 't') for i in range(self.data.num_partners)])
+        self.variables.t = np.array([m.addVar(lb = -gb.GRB.INFINITY, name = 't') for i in range(self.data.num_partners)])
+        self.variables.t_pos = np.array([m.addVar(obj=self.data.pref[i], name = 't_pos') for i in range(self.data.num_partners)])
         self.t_old = np.zeros(self.data.num_partners)
         self.y = np.zeros(self.data.num_partners)
         m.update()
         
     def _build_constraints(self):
         self.constraints.pow_bal = self.model.addConstr(sum(self.variables.p) == sum(self.variables.t))
+        for i in range(self.data.num_partners):
+            self.model.addConstr(self.variables.t[i] <= self.variables.t_pos[i])
+            self.model.addConstr(self.variables.t[i] >= -self.variables.t_pos[i])
         
     def _build_objective(self):
         self.obj_assets = sum(self.data.b*self.variables.p + self.data.a*self.variables.p*self.variables.p)

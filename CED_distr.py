@@ -105,10 +105,10 @@ if grid:
     ID_grid = n-1
     grid_ag = info.index[-1]
     for idx in ID_CM:
-        inc[-1,idx,idx_mrk-1] = 100
-        inc[idx,-1,idx_mrk-1] = 100
-    inc[-1,ID_p2p[-1],idx_mrk-1] = 100
-    inc[ID_p2p[-1],-1,idx_mrk-1] = 100
+        inc[-1,idx,idx_mrk-1] = 10
+        inc[idx,-1,idx_mrk-1] = 10
+    inc[-1,ID_p2p[-1],idx_mrk-1] = 10
+    inc[ID_p2p[-1],-1,idx_mrk-1] = 10
 
 
 #%%
@@ -156,7 +156,7 @@ if display:
     plt.figure()
     ax = plt.axes(projection='3d')
     trades = inc.nonzero()
-    points = ax.scatter3D(trades[0], trades[2], trades[1], c=T[trades], edgecolors = None, cmap='rainbow', vmin=-lim, vmax=lim)
+    points = ax.scatter3D(trades[0], trades[2], trades[1], c=T[trades], edgecolors = None, cmap='coolwarm', vmin=-lim, vmax=lim)
     plt.colorbar(points)
 
 
