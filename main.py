@@ -112,7 +112,7 @@ if grid:
 
 
 #%%
-rho = 100 
+rho = 10
 
 #Init Prosumer classes 
 pros = {}
