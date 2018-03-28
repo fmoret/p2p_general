@@ -17,17 +17,19 @@ dd1 = os.getcwd()
 def create_comm(G, size, num, data=None):
     comm = 'C'+str(num)+'_'
     CM = comm+'cm'
-    G.add_node(CM, ID=CM, a=0, b=0, Pmin=0, Pmax=0, num_ass=0)
+    IE = comm+'ie'
+    G.add_node(CM, ID=CM, ntype = 'CM', a=0, b=0, Pmin=0, Pmax=0, num_ass=0)
+    G.add_node(IE, ID=IE, ntype = 'IE', a=0, b=0, Pmin=0, Pmax=0, num_ass=0)
     if data is not None:    
         comm_ag = data[data['Community']==num].index.unique()
         size = len(comm_ag)
         
-    idx = [CM]
+    idx = [IE, CM]
     for i in range(size):
         node = comm+str(i)
         idx += [node]
         if data is not None:
-            G.add_node(node, ID = comm_ag[i],
+            G.add_node(node, ID = comm_ag[i], ntype = 'C_node',
                        a = data[data.index==comm_ag[i]]['a'].values,
                        b = data[data.index==comm_ag[i]]['b'].values,
                        Pmin = data[data.index==comm_ag[i]]['Pmin'].values,
@@ -36,9 +38,8 @@ def create_comm(G, size, num, data=None):
         else:
             G.add_node(node)
             
-        G.add_edge(CM, node, key='comm', pref=0.001)
-        G.add_edge(CM, node, key='imp', pref=0.1)
-        G.add_edge(CM, node, key='exp', pref=0.1)
+        G.add_edge(CM, node, key='comm', pref=0.01)
+        G.add_edge(IE, node, key='ie', pref=1)
         
     return idx  #G.subgraph(idx), 
         
@@ -54,7 +55,7 @@ def create_p2p(G, size, num, data=None):
         node = p2p+str(i)
         idx += [node]
         if data is not None:
-            G.add_node(node, ID = p2p_ag[i],
+            G.add_node(node, ID = p2p_ag[i], ntype = 'P_node',
                        a = data[data.index==p2p_ag[i]]['a'].values,
                        b = data[data.index==p2p_ag[i]]['b'].values,
                        Pmin = data[data.index==p2p_ag[i]]['Pmin'].values,
@@ -71,7 +72,7 @@ def create_p2p(G, size, num, data=None):
 
 def create_grid(G, nodes=[], data=None):
     if data is not None:
-        G.add_node('grid', ID='grid',
+        G.add_node('grid', ID='grid', ntype = 'G',
                    a = [0],
                    b = data[data['Type']=='Grid']['b'].values,
                    Pmin = [-np.inf],
@@ -81,8 +82,7 @@ def create_grid(G, nodes=[], data=None):
         G.add_node('grid')
         
     for i in nodes:
-        G.add_edge('grid', i, key='imp', pref=10)
-        G.add_edge('grid', i, key='exp', pref=-10)
+        G.add_edge('grid', i, key='ie', pref=10)
             
     return ['grid']
 
@@ -114,9 +114,9 @@ p2p = np.array(info['p2p'].dropna().unique(), dtype=int)
 #Initialize graph
 try:
     del G
-    G = nx.MultiGraph()
+    G = nx.Graph()
 except NameError:
-    G = nx.MultiGraph()
+    G = nx.Graph()
     
 #Create community and p2p layers
 G_comm = [create_comm(G, size = 0, num = i, data = info) for i in comm]
@@ -127,7 +127,7 @@ G_p2p = [create_p2p(G, size = 0, num = i, data = info) for i in p2p]
 
 #Create grid node
 to_grid = [item[0] for item in G_comm] + [item for sublist in G_p2p for item in sublist]
-G_grid = create_grid(G, to_grid, data=info)
+G_grid = create_grid(G, nodes=to_grid, data=info)
 
 #Draw graph
 plt.figure()
@@ -138,26 +138,22 @@ nodes = [item for sublist in G_comm for item in sublist] + [item for sublist in 
 #%%
 inc = np.zeros([len(nodes),len(nodes),4])
 G_0 = G.copy()
-for u,v,key,data in G.edges(data=True,keys=True):
-    if key != 'comm':
-        G_0.remove_edge(u,v,key=key)
+for u,v,data in G.edges(data=True):
+    if data['key'] != 'comm':
+        G_0.remove_edge(u,v)
 G_1 = G.copy()
-for u,v,key,data in G.edges(data=True,keys=True):
-    if key != 'p2p':
-        G_1.remove_edge(u,v,key=key)
+for u,v,data in G.edges(data=True):
+    if data['key'] != 'p2p':
+        G_1.remove_edge(u,v)
 G_2 = G.copy()
-for u,v,key,data in G.edges(data=True,keys=True):
-    if key != 'imp':
-        G_2.remove_edge(u,v,key=key)
-G_3 = G.copy()
-for u,v,key,data in G.edges(data=True,keys=True):
-    if key != 'exp':
-        G_3.remove_edge(u,v,key=key)
+for u,v,data in G.edges(data=True):
+    if data['key'] != 'ie':
+        G_2.remove_edge(u,v)
 
 inc[:,:,0] = nx.to_numpy_array(G_0, weight='pref')
 inc[:,:,1] = nx.to_numpy_array(G_1, weight='pref')
 inc[:,:,2] = nx.to_numpy_array(G_2, weight='pref')
-inc[:,:,3] = nx.to_numpy_array(G_3, weight='pref')
+
 #%%
 rho = 100
 

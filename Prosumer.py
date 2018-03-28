@@ -23,17 +23,10 @@ class Prosumer:
         self.data.Pmin = data['Pmin']
         self.data.Pmax = data['Pmax']
         self.data.num_assets = data['num_ass']
+        self.data.type = data['ntype']
         self.data.partners = inc.nonzero()
-        self.data.partners_free = inc[:,:2].nonzero()
-        self.data.partners_pos = inc[:,2:].nonzero()
         self.data.pref = inc[inc.nonzero()]
-        self.data.pref_free = inc[:,:2][inc[:,:2].nonzero()]
-        self.data.pref_pos = inc[:,2:][inc[:,2:].nonzero()]
         self.data.num_partners = len(self.data.pref)
-        self.data.num_partners_free = len(self.data.pref_free)
-        self.data.num_partners_pos = len(self.data.pref_pos)
-        for i in range(self.data.num_partners_pos):
-            self.data.partners_pos[1][i] += 2
         self.data.rho = rho
         
         self.variables = expando()
@@ -46,7 +39,7 @@ class Prosumer:
         self._update_objective()
         self.model.optimize()
         for i in range(self.data.num_partners):
-            self.t_old[i] = self.t[i].x
+            self.t_old[i] = self.variables.t[i].x
         trade[self.data.partners] = self.t_old
         return trade
 
@@ -64,19 +57,17 @@ class Prosumer:
     def _build_variables(self):
         m = self.model
         self.variables.p = np.array([m.addVar(lb = self.data.Pmin[i], ub = self.data.Pmax[i], name = 'p') for i in range(self.data.num_assets)])
-        self.variables.t_free = np.array([m.addVar(lb = -gb.GRB.INFINITY, name = 't_free') for i in range(self.data.num_partners_free)])
-        self.variables.abs_t = np.array([m.addVar(obj=self.data.pref_free[i], name = 'abs_t') for i in range(self.data.num_partners_free)])
-        self.variables.t_pos = np.array([m.addVar(obj=self.data.pref_pos[i], name = 't_pos') for i in range(self.data.num_partners_pos)])
-        self.t = np.append(self.variables.t_free, self.variables.t_pos)
+        self.variables.t = np.array([m.addVar(lb = -gb.GRB.INFINITY, name = 't') for i in range(self.data.num_partners)])
+        self.variables.t_pos = np.array([m.addVar(obj=self.data.pref[i], name = 't_pos') for i in range(self.data.num_partners)])
         self.t_old = np.zeros(self.data.num_partners)
         self.y = np.zeros(self.data.num_partners)
         m.update()
         
     def _build_constraints(self):
-        self.constraints.pow_bal = self.model.addConstr(sum(self.variables.p) == sum(self.variables.t_free) + sum(self.variables.t_pos))
-        for i in range(self.data.num_partners_free):
-            self.model.addConstr(self.variables.t_free[i] <= self.variables.abs_t[i])
-            self.model.addConstr(self.variables.t_free[i] >= -self.variables.abs_t[i])
+        self.constraints.pow_bal = self.model.addConstr(sum(self.variables.p) == sum(self.variables.t))
+        for i in range(self.data.num_partners):
+            self.model.addConstr(self.variables.t[i] <= self.variables.t_pos[i])
+            self.model.addConstr(self.variables.t[i] >= -self.variables.t_pos[i])
         
     def _build_objective(self):
         self.obj_assets = sum(self.data.b*self.variables.p + self.data.a*self.variables.p*self.variables.p)
@@ -85,9 +76,9 @@ class Prosumer:
     #   Model Updating
     ###    
     def _update_objective(self):
-        augm_lag = (-sum(self.y*( self.t - self.t_average ) ) + 
-                    self.data.rho/2*sum( ( self.t - self.t_average )
-                                        *( self.t - self.t_average ) )
+        augm_lag = (-sum(self.y*( self.variables.t - self.t_average ) ) + 
+                    self.data.rho/2*sum( ( self.variables.t - self.t_average )
+                                        *( self.variables.t - self.t_average ) )
                    )
         self.model.setObjective(self.obj_assets + augm_lag)
         self.model.update()
@@ -96,8 +87,7 @@ class Prosumer:
     #   Iteration Update
     ###    
     def _iter_update(self, trade):
-        temp = np.append(trade[self.data.partners_free], trade[self.data.partners_pos])
-        self.t_average = (self.t_old - temp)/2
+        self.t_average = (self.t_old - trade[self.data.partners])/2
         self.y -= self.data.rho*(self.t_old - self.t_average)
 #        for i in range(self.data.num_partners):
 #            self.y[i] +=  self.rho*(self.t_old[i] + self.t_others[i])/2
