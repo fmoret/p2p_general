@@ -20,8 +20,8 @@ el_price = pd.read_csv(filename0,index_col=[0])['Market price ($/MWh)']
 
 filename1=data_path+r'\info.csv'
 info = pd.read_csv(filename1,index_col=[0])
-info.at[info.index[-1],'Pmin'] = 0 #-np.inf
-info.at[info.index[-1],'Pmax'] = 0 #np.inf
+info.at[info.index[-1],'Pmin'] = -np.inf
+info.at[info.index[-1],'Pmax'] = np.inf
 
 filename2=data_path+r'\load_min.csv'
 load_min = pd.read_csv(filename2,index_col=[0], skiprows = [1])
